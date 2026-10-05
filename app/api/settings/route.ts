@@ -1,0 +1,3 @@
+import {database,failure,sameOrigin} from '../../../lib/storage';
+export async function GET(){try{const v=await database().prepare('SELECT data FROM settings WHERE id=?').bind('school').first<any>();return Response.json(v?JSON.parse(v.data):{factors:['','',''],counts:[0,0,0],reserve:0});}catch(e){return failure(e);}}
+export async function POST(r:Request){try{if(!sameOrigin(r))return new Response('Forbidden',{status:403});const d=await r.json();if(JSON.stringify(d).length>10000)return new Response('Too large',{status:400});await database().prepare('INSERT INTO settings(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data').bind('school',JSON.stringify(d)).run();return Response.json(d);}catch(e){return failure(e);}}

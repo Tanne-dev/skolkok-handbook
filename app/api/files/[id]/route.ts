@@ -1,0 +1,2 @@
+import {bucket,failure} from '../../../../lib/storage';
+export async function GET(r:Request,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;const f=await bucket().get(id);if(!f)return new Response('Not found',{status:404});return new Response(f.body,{headers:{'Content-Type':f.httpMetadata?.contentType||'application/octet-stream','Cache-Control':'private, max-age=3600','X-Content-Type-Options':'nosniff'}});}catch(e){return failure(e);}}
