@@ -1,0 +1,11 @@
+import { z } from 'zod';
+const numberText=z.string().max(30).refine(s=>s===''||(Number.isFinite(Number(s))&&Number(s)>=0),'Số lượng không hợp lệ');
+export const filePath=z.string().regex(/^\/api\/files\/[0-9a-f-]{36}$/i);
+export const recipeSchema=z.object({id:z.string().uuid(),name:z.string().min(1).max(500),category:z.enum(['Món hằng ngày','Bánh','Sốt','Salad']),date:z.string().max(20),base:numberText,notes:z.string().max(30000),image:z.union([z.literal(''),filePath]),source:z.union([z.literal(''),filePath]),raw:z.string().max(100000),steps:z.array(z.string().max(30000)).max(500),ingredients:z.array(z.object({name:z.string().max(500),amount:numberText,unit:z.enum(['g','kg','ml','l','cái','quả','phần'])})).max(500),reviewed:z.boolean()});
+export const configSchema=z.object({factors:z.array(z.string().max(30).refine(s=>s===''||(Number.isFinite(Number(s))&&Number(s)>0))).length(3),counts:z.array(z.number().int().min(0).max(100000)).length(3),reserve:z.number().min(0).max(1000)});
+export const emptyConfig={factors:['','',''],counts:[0,0,0],reserve:0};
+export const snapshotSchema=z.object({format:z.literal('skolkok-backup'),version:z.literal(1),createdAt:z.string().datetime(),recipes:z.array(recipeSchema).max(500),settings:configSchema});
+export const backupSchema=snapshotSchema.extend({files:z.array(z.object({path:filePath,type:z.enum(['image/jpeg','image/png','image/webp']),sha256:z.string().regex(/^[a-f0-9]{64}$/),base64:z.string().min(4).max(14*1024*1024).refine(s=>s.length%4===0&&!/[^A-Za-z0-9+/=]/.test(s)&&!/=/.test(s.slice(0,-2))&&/^(?:[A-Za-z0-9+/]{2}|[A-Za-z0-9+/]=|==)$/.test(s.slice(-2)))})).max(1000)});
+export type Backup=z.infer<typeof backupSchema>;
+export const MAX_BACKUP=50*1024*1024;
+export function parseBackup(value:unknown):Backup {const b=backupSchema.parse(value);if(new Set(b.recipes.map(r=>r.id)).size!==b.recipes.length)throw Error('Bản sao lưu có mã công thức trùng nhau.');const paths=new Set(b.files.map(f=>f.path));if(paths.size!==b.files.length)throw Error('Bản sao lưu có ảnh trùng mã.');let size=0;for(const f of b.files){size+=f.base64.length;if(size>MAX_BACKUP)throw Error('Bản sao lưu vượt quá 50 MB.');}for(const r of b.recipes)for(const path of [r.image,r.source])if(path&&!paths.has(path))throw Error('Bản sao lưu thiếu ảnh của công thức: '+r.name);return b;}
