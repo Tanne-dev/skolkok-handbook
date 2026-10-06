@@ -1,2 +1,3 @@
-import {bucket,failure} from '../../../../lib/storage';
-export async function GET(r:Request,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;const f=await bucket().get(id);if(!f)return new Response('Not found',{status:404});return new Response(f.body,{headers:{'Content-Type':f.httpMetadata?.contentType||'application/octet-stream','Cache-Control':'private, max-age=3600','X-Content-Type-Options':'nosniff'}});}catch(e){return failure(e);}}
+import {requireOwner} from '../../../../lib/supabase/server';
+import {failure,BUCKET} from '../../../../lib/storage';
+export async function GET(r:Request,{params}:{params:Promise<{id:string}>}){try{const {client,user}=await requireOwner();const {id}=await params;if(!/^[0-9a-f-]{36}$/i.test(id))return new Response('Not found',{status:404});const {data,error}=await client.storage.from(BUCKET).createSignedUrl(`${user.id}/${id}`,60);if(error||!data)return new Response('Not found',{status:404});return new Response(null,{status:307,headers:{Location:data.signedUrl,'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'}});}catch(e){return failure(e);}}
